@@ -52,7 +52,7 @@ def index_db():
     for fp in music_path.rglob("*.mp3"):
         try:
             path_str = str(fp)
-            track_id = generate_id(path_str)    # Generate MD5
+            track_id = generate_id(path_str)
             current_mtime = fp.stat().st_mtime
 
             # check if updated
