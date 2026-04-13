@@ -1,38 +1,31 @@
-import hashlib
 import os
 import sqlite3
+import hashlib
+import acoustid
 from pathlib import Path
-from mutagen.easyid3 import EasyID3
 from dotenv import load_dotenv
+from mutagen.easyid3 import EasyID3
 
-# This script crawls the library and populates a SQLite database.
-# Using EasyID3 ensures it gets the most common tags without complex
-# frame logic.
 
 load_dotenv()
 
-MUSIC_DIR = os.getenv("MUSIC_DIR")
-if not MUSIC_DIR:
-    raise RuntimeError("MUSIC_DIR not set in .env")
-
-DB_PATH = os.getenv("DB_PATH")
-if not DB_PATH:
-    raise RuntimeError("DB_PATH not set in .env")
-
-music_path = Path(str(MUSIC_DIR)).expanduser()
-db_path = Path(str(DB_PATH))
-
-music_path.parent.mkdir(parents=True, exist_ok=True)
-db_path.parent.mkdir(parents=True, exist_ok=True)
+DB_PATH = os.getenv("DB_PATH", "data/music.db")
+MUSIC_DIR = Path(os.getenv("MUSIC_DIR", "/music")).expanduser()
+ACOUSTID_API_KEY = os.getenv("ACOUSTID_API_KEY")
 
 
-def generate_id(file_path:str)->str:
-    """Creates a stable 32-character MD5 hash of the path."""
-    return hashlib.md5(file_path.encode('utf-8')).hexdigest()
+def generate_id(file_path: Path) -> str:
+    """Creates a stable MD5 hash based on the relative path to MUSIC_DIR."""
+    try:
+        relative_path = file_path.relative_to(MUSIC_DIR)
+    except ValueError:
+        relative_path = file_path
+    return hashlib.md5(str(relative_path).encode('utf-8')).hexdigest()
 
 
 def init_db():
-    conn = sqlite3.connect(db_path)
+    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS tracks (
             id TEXT PRIMARY KEY,
@@ -42,39 +35,45 @@ def init_db():
             album TEXT,
             last_mtime REAL
         )
-     """)
+    """)
     conn.commit()
     return conn
 
+def get_metadata(path: Path):
+    try:
+        audio = EasyID3(str(path))
+        title = audio.get('title', [None])[0]
+        artist = audio.get('artist', [None])[0]
+        album = audio.get('album', ['Unknown'])[0]
 
-def index_db():
+        if (not title or not artist) and ACOUSTID_API_KEY:
+            results = acoustid.match(ACOUSTID_API_KEY, str(path))
+            for got_score, got_rid, got_title, got_artist in results:
+                if got_score > 0.8:
+                    return got_title, got_artist, album
+        return title or path.stem, artist or "Unknown", album
+    except Exception:
+        return path.stem, "Unknown", "Unknown"
+
+
+def scan():
     conn = init_db()
-    for fp in music_path.rglob("*.mp3"):
-        try:
-            path_str = str(fp)
-            track_id = generate_id(path_str)
-            current_mtime = fp.stat().st_mtime
+    for fp in MUSIC_DIR.rglob("*.mp3"):
+        track_id = generate_id(fp)
+        current_mtime = fp.stat().st_mtime
 
-            # check if updated
-            row = conn.execute("SELECT last_mtime FROM tracks WHERE id = ?", (track_id,)).fetchone()
+        # check if updated
+        row = conn.execute("SELECT last_mtime FROM tracks WHERE id = ?", (track_id,)).fetchone()
 
-            if row is None or row[0] < current_mtime:
-                audio = EasyID3(path_str)
-                title = audio.get('title', [fp.stem])[0]
-                artist = audio.get('artist', ['Unknown'])[0]
-                album = audio.get('album', ['Unknown'])[0]
-                conn.execute("""
-                INSERT OR REPLACE INTO tracks (id, path, title, artist, album, last_mtime)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (track_id, path_str, title, artist, album, current_mtime))
-            conn.commit()
-        except Exception as e:
-            print(f"Skipping {fp.name}: {e}")
+        if row is None or row[0] < current_mtime:
+            title, artist, album = get_metadata(fp)
+            conn.execute("""
+            INSERT OR REPLACE INTO tracks (id, path, title, artist, album, last_mtime)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (track_id, str(fp), title, artist, album, current_mtime))
+        conn.commit()
     conn.close()
 
 
 if __name__ == "__main__":
-    init_db()
-    print("Database initialized.")
-    index_db()
-    print("Library indexed.")
+    scan()
