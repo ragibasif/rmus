@@ -48,9 +48,9 @@ def get_metadata(path: Path):
 
         if (not title or not artist) and ACOUSTID_API_KEY:
             results = acoustid.match(ACOUSTID_API_KEY, str(path))
-            for got_score, got_rid, got_title, got_artist in results:
-                if got_score > 0.8:
-                    return got_title, got_artist, album
+            for res_score, res_recording_id, res_title, res_artist in results:
+                if res_score > 0.8:
+                    return res_title, res_artist, album
         return title or path.stem, artist or "Unknown", album
     except Exception:
         return path.stem, "Unknown", "Unknown"

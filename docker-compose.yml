@@ -1,0 +1,29 @@
+services:
+  server:
+    build: .
+    container_name: music_server
+    env_file: .env
+    ports:
+      - "4040:4040"
+    volumes:
+      - ${MUSIC_DIR}:/music:ro
+      - ./data:/app/data
+    environment:
+      - MUSIC_DIR=/music
+      - DB_PATH=/app/data/music.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4040/rest/ping.view"]
+      interval: 30s
+    restart: unless-stopped
+
+  db:
+    build: .
+    container_name: music_db
+    env_file: .env
+    volumes:
+      - ${MUSIC_DIR}:/music:ro
+      - ./data:/app/data
+    environment:
+      - MUSIC_DIR=/music
+      - DB_PATH=/app/data/music.db
+    entrypoint: ["python", "db.py"]

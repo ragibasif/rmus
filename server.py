@@ -34,7 +34,11 @@ def subsonic_wrapper(data_key: str, data: any):
 async def index(request: Request):
     db = get_db()
     tracks = db.execute("SELECT id, title, artist, album FROM tracks").fetchall()
-    return templates.TemplateResponse("index.html", {"request": request, "tracks": tracks})
+    return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={"tracks": tracks}
+        )
 
 
 @app.get("/rest/ping.view")
@@ -47,9 +51,15 @@ async def stream(id: str):
     db = get_db()
     track = db.execute("SELECT path FROM tracks WHERE id = ?", (id,)).fetchone()
     if track:
-        return FileResponse(track["path"])
-    return {"error": "Not found"}
+        file_path = track["path"]
+        print(f"Attempting to stream: {file_path}")
 
+        if os.path.exists(file_path):
+            return FileResponse(file_path, media_type="audio/mpeg")
+        else:
+            print(f"File not found on disk: {file_path}")
+            return {"error": "File not found on disk"}
+    return {"error": "Track ID not in database"}
 
 @app.get("/admin/db")
 async def view_db():
