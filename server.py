@@ -25,7 +25,7 @@ def subsonic_wrapper(data_key: str, data: any):
             "version": "1.16.1",
             "type": "server",
             "openSubsonic": True,
-            data_key: data
+            data_key: data,
         }
     }
 
@@ -35,10 +35,8 @@ async def index(request: Request):
     db = get_db()
     tracks = db.execute("SELECT id, title, artist, album FROM tracks").fetchall()
     return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={"tracks": tracks}
-        )
+        request=request, name="index.html", context={"tracks": tracks}
+    )
 
 
 @app.get("/rest/ping.view")
@@ -61,6 +59,7 @@ async def stream(id: str):
             return {"error": "File not found on disk"}
     return {"error": "Track ID not in database"}
 
+
 @app.get("/admin/db")
 async def view_db():
     db = get_db()
@@ -71,4 +70,5 @@ async def view_db():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=4040)

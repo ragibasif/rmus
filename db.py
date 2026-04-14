@@ -20,7 +20,7 @@ def generate_id(file_path: Path) -> str:
         relative_path = file_path.relative_to(MUSIC_DIR)
     except ValueError:
         relative_path = file_path
-    return hashlib.md5(str(relative_path).encode('utf-8')).hexdigest()
+    return hashlib.md5(str(relative_path).encode("utf-8")).hexdigest()
 
 
 def init_db():
@@ -39,12 +39,13 @@ def init_db():
     conn.commit()
     return conn
 
+
 def get_metadata(path: Path):
     try:
         audio = EasyID3(str(path))
-        title = audio.get('title', [None])[0]
-        artist = audio.get('artist', [None])[0]
-        album = audio.get('album', ['Unknown'])[0]
+        title = audio.get("title", [None])[0]
+        artist = audio.get("artist", [None])[0]
+        album = audio.get("album", ["Unknown"])[0]
 
         if (not title or not artist) and ACOUSTID_API_KEY:
             results = acoustid.match(ACOUSTID_API_KEY, str(path))
@@ -63,14 +64,19 @@ def scan():
         current_mtime = fp.stat().st_mtime
 
         # check if updated
-        row = conn.execute("SELECT last_mtime FROM tracks WHERE id = ?", (track_id,)).fetchone()
+        row = conn.execute(
+            "SELECT last_mtime FROM tracks WHERE id = ?", (track_id,)
+        ).fetchone()
 
         if row is None or row[0] < current_mtime:
             title, artist, album = get_metadata(fp)
-            conn.execute("""
+            conn.execute(
+                """
             INSERT OR REPLACE INTO tracks (id, path, title, artist, album, last_mtime)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (track_id, str(fp), title, artist, album, current_mtime))
+        """,
+                (track_id, str(fp), title, artist, album, current_mtime),
+            )
         conn.commit()
     conn.close()
 
