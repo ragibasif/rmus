@@ -1,6 +1,8 @@
 import os
 import sqlite3
-from fastapi import FastAPI, Request
+from typing import Any
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
@@ -17,7 +19,7 @@ def get_db():
     return conn
 
 
-def subsonic_wrapper(data_key: str, data: any):
+def subsonic_wrapper(data_key: str, data: Any):
     """Wraps data in the standard Subsonic response format"""
     return {
         "subsonic-response": {
@@ -33,10 +35,15 @@ def subsonic_wrapper(data_key: str, data: any):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     db = get_db()
-    tracks = db.execute("SELECT id, title, artist, album FROM tracks").fetchall()
-    return templates.TemplateResponse(
-        request=request, name="index.html", context={"tracks": tracks}
-    )
+    try:
+        tracks = db.execute(
+            "SELECT id, title, artist, album FROM tracks ORDER BY artist, album, title"
+        ).fetchall()
+        return templates.TemplateResponse(
+            request=request, name="index.html", context={"tracks": tracks}
+        )
+    finally:
+        db.close()
 
 
 @app.get("/rest/ping.view")
@@ -47,25 +54,32 @@ async def ping():
 @app.get("/rest/stream.view")
 async def stream(id: str):
     db = get_db()
-    track = db.execute("SELECT path FROM tracks WHERE id = ?", (id,)).fetchone()
-    if track:
-        file_path = track["path"]
-        print(f"Attempting to stream: {file_path}")
+    try:
+        track = db.execute("SELECT path FROM tracks WHERE id = ?", (id,)).fetchone()
+    finally:
+        db.close()
 
-        if os.path.exists(file_path):
-            return FileResponse(file_path, media_type="audio/mpeg")
-        else:
-            print(f"File not found on disk: {file_path}")
-            return {"error": "File not found on disk"}
-    return {"error": "Track ID not in database"}
+    if not track:
+        raise HTTPException(status_code=404, detail="Track ID not in database")
+
+    file_path = track["path"]
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    return FileResponse(file_path, media_type="audio/mpeg")
 
 
 @app.get("/admin/db")
 async def view_db():
+    if os.getenv("ADMIN_DB_ENABLED", "").lower() not in {"1", "true", "yes"}:
+        raise HTTPException(status_code=404, detail="Not found")
+
     db = get_db()
-    # This fetches everything and converts it to a list of dicts for easy display
-    rows = db.execute("SELECT * FROM tracks").fetchall()
-    return {"count": len(rows), "data": [dict(r) for r in rows]}
+    try:
+        rows = db.execute("SELECT * FROM tracks").fetchall()
+        return {"count": len(rows), "data": [dict(r) for r in rows]}
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

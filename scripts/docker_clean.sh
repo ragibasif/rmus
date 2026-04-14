@@ -4,4 +4,4 @@
 docker compose down --remove-orphans
 
 # (Optional) Remove the images to save disk space
-docker rmi rmus-music-server rmus-db
+docker rmi rmus-server rmus-db

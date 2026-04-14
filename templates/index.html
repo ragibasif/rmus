@@ -14,7 +14,7 @@
     <h1>Library</h1>
     <div id="list">
         {% for track in tracks %}
-        <div class="track" onclick="play('{{ track.id }}', '{{ track.title }}')">
+        <div class="track" data-id="{{ track.id }}" data-title="{{ track.title }}">
             <strong>{{ track.title }}</strong> - {{ track.artist }} <small>({{ track.album }})</small>
         </div>
         {% endfor %}
@@ -30,6 +30,12 @@
             a.src = `/rest/stream.view?id=${id}`;
             a.play();
         }
+
+        document.querySelectorAll('.track').forEach((track) => {
+            track.addEventListener('click', () => {
+                play(track.dataset.id, track.dataset.title);
+            });
+        });
     </script>
 </body>
 </html>

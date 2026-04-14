@@ -1,7 +1,7 @@
 # Variables
 PYTHON := uv run python
 RUFF := uv run ruff
-APP_MODULE := app.main:app
+APP_MODULE := server:app
 DB_CONTAINER := my_project_db
 
 .PHONY: help

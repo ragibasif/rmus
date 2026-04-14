@@ -16,9 +16,7 @@ Create a `.env` file in the root directory:
 MUSIC_DIR=/Users/yourname/path/to/mp3s
 DB_PATH=/app/data/music.db
 ACOUSTID_API_KEY=your_key_here
-MUSICBRAINZ_APP_NAME=rmus
-MUSICBRAINZ_VERSION=1.0
-MUSICBRAINZ_CONTACT=email@email.com
+ADMIN_DB_ENABLED=false
 ```
 
 ### 3. Deploy
@@ -80,7 +78,7 @@ rmus/
 ├── docker-compose.yml  # Service orchestration
 ├── pyproject.toml      # Dependency definitions
 ├── Makefile            # uv rules
-└── run.sh              # Automation script
+└── scripts/            # Docker helper scripts
 ```
 
 ## Important Note on Pathing

@@ -59,26 +59,39 @@ def get_metadata(path: Path):
 
 def scan():
     conn = init_db()
-    for fp in MUSIC_DIR.rglob("*.mp3"):
-        track_id = generate_id(fp)
-        current_mtime = fp.stat().st_mtime
+    current_ids: set[str] = set()
 
-        # check if updated
-        row = conn.execute(
-            "SELECT last_mtime FROM tracks WHERE id = ?", (track_id,)
-        ).fetchone()
+    try:
+        for fp in MUSIC_DIR.rglob("*.mp3"):
+            track_id = generate_id(fp)
+            current_ids.add(track_id)
+            current_mtime = fp.stat().st_mtime
 
-        if row is None or row[0] < current_mtime:
-            title, artist, album = get_metadata(fp)
+            row = conn.execute(
+                "SELECT last_mtime FROM tracks WHERE id = ?", (track_id,)
+            ).fetchone()
+
+            if row is None or row[0] < current_mtime:
+                title, artist, album = get_metadata(fp)
+                conn.execute(
+                    """
+                INSERT OR REPLACE INTO tracks (id, path, title, artist, album, last_mtime)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """,
+                    (track_id, str(fp), title, artist, album, current_mtime),
+                )
+
+        if current_ids:
+            placeholders = ",".join("?" for _ in current_ids)
             conn.execute(
-                """
-            INSERT OR REPLACE INTO tracks (id, path, title, artist, album, last_mtime)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """,
-                (track_id, str(fp), title, artist, album, current_mtime),
+                f"DELETE FROM tracks WHERE id NOT IN ({placeholders})", tuple(current_ids)
             )
+        else:
+            conn.execute("DELETE FROM tracks")
+
         conn.commit()
-    conn.close()
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":
