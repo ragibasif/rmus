@@ -1,4 +1,4 @@
-# rmus - Self-Hosted Music Server
+# rmus
 
 A lightweight, Dockerized music streaming server built with **FastAPI**, **SQLite**, and **AcoustID**. It provides a simple web frontend and a Subsonic-compatible streaming endpoint.
 
