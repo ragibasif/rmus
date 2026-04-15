@@ -2,7 +2,7 @@
 PYTHON := uv run python
 RUFF := uv run ruff
 APP_MODULE := server:app
-DB_CONTAINER := my_project_db
+DB_CONTAINER := music_db
 
 .PHONY: help
 help: ## Show this help message
